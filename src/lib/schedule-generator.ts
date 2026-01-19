@@ -130,6 +130,7 @@ export const generateSchedule = (config: ScheduleConfig): Schedule => {
   }
 
   return {
+    id: `schedule-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
     config,
     days,
   };

@@ -1,41 +1,112 @@
 import { Schedule } from "@/types/schedule";
 
-const SCHEDULE_KEY = "study-schedule";
+const SCHEDULES_KEY = "study-schedules";
+const ACTIVE_SCHEDULE_KEY = "active-schedule-id";
 const THEME_KEY = "theme-preference";
+
+const parseSchedule = (schedule: any): Schedule => {
+  return {
+    ...schedule,
+    config: {
+      ...schedule.config,
+      createdAt: new Date(schedule.config.createdAt),
+    },
+    days: schedule.days.map((day: any) => ({
+      ...day,
+      date: new Date(day.date),
+    })),
+  };
+};
+
+export const getAllSchedules = (): Schedule[] => {
+  try {
+    const data = localStorage.getItem(SCHEDULES_KEY);
+    if (!data) return [];
+    
+    const schedules = JSON.parse(data);
+    return schedules.map(parseSchedule);
+  } catch (error) {
+    console.error("Failed to load schedules:", error);
+    return [];
+  }
+};
 
 export const saveSchedule = (schedule: Schedule): void => {
   try {
-    localStorage.setItem(SCHEDULE_KEY, JSON.stringify(schedule));
+    const schedules = getAllSchedules();
+    const existingIndex = schedules.findIndex(s => s.id === schedule.id);
+    
+    if (existingIndex >= 0) {
+      schedules[existingIndex] = schedule;
+    } else {
+      schedules.unshift(schedule);
+    }
+    
+    localStorage.setItem(SCHEDULES_KEY, JSON.stringify(schedules));
+    setActiveScheduleId(schedule.id);
   } catch (error) {
     console.error("Failed to save schedule:", error);
   }
 };
 
-export const loadSchedule = (): Schedule | null => {
+export const loadSchedule = (id?: string): Schedule | null => {
   try {
-    const data = localStorage.getItem(SCHEDULE_KEY);
-    if (!data) return null;
+    const schedules = getAllSchedules();
+    if (schedules.length === 0) return null;
     
-    const schedule = JSON.parse(data);
-    // Convert date strings back to Date objects
-    schedule.config.createdAt = new Date(schedule.config.createdAt);
-    schedule.days = schedule.days.map((day: any) => ({
-      ...day,
-      date: new Date(day.date),
-    }));
+    const targetId = id || getActiveScheduleId();
+    if (targetId) {
+      const found = schedules.find(s => s.id === targetId);
+      if (found) return found;
+    }
     
-    return schedule;
+    return schedules[0];
   } catch (error) {
     console.error("Failed to load schedule:", error);
     return null;
   }
 };
 
+export const deleteSchedule = (id: string): void => {
+  try {
+    const schedules = getAllSchedules();
+    const filtered = schedules.filter(s => s.id !== id);
+    localStorage.setItem(SCHEDULES_KEY, JSON.stringify(filtered));
+    
+    if (getActiveScheduleId() === id) {
+      setActiveScheduleId(filtered[0]?.id || null);
+    }
+  } catch (error) {
+    console.error("Failed to delete schedule:", error);
+  }
+};
+
+export const getActiveScheduleId = (): string | null => {
+  try {
+    return localStorage.getItem(ACTIVE_SCHEDULE_KEY);
+  } catch {
+    return null;
+  }
+};
+
+export const setActiveScheduleId = (id: string | null): void => {
+  try {
+    if (id) {
+      localStorage.setItem(ACTIVE_SCHEDULE_KEY, id);
+    } else {
+      localStorage.removeItem(ACTIVE_SCHEDULE_KEY);
+    }
+  } catch (error) {
+    console.error("Failed to set active schedule:", error);
+  }
+};
+
 export const clearSchedule = (): void => {
   try {
-    localStorage.removeItem(SCHEDULE_KEY);
+    localStorage.removeItem(SCHEDULES_KEY);
+    localStorage.removeItem(ACTIVE_SCHEDULE_KEY);
   } catch (error) {
-    console.error("Failed to clear schedule:", error);
+    console.error("Failed to clear schedules:", error);
   }
 };
 

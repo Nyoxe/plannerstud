@@ -17,7 +17,11 @@ import { ScheduleConfig, Level, Goal } from "@/types/schedule";
 import { generateSchedule } from "@/lib/schedule-generator";
 import { saveSchedule } from "@/lib/storage";
 
-export function ScheduleForm() {
+interface ScheduleFormProps {
+  onSuccess?: () => void;
+}
+
+export function ScheduleForm({ onSuccess }: ScheduleFormProps) {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
   
@@ -72,6 +76,9 @@ export function ScheduleForm() {
     const schedule = generateSchedule(config);
     saveSchedule(schedule);
     
+    if (onSuccess) {
+      onSuccess();
+    }
     navigate("/schedule");
   };
 
