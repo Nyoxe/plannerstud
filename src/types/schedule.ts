@@ -29,6 +29,7 @@ export interface ScheduleConfig {
 }
 
 export interface Schedule {
+  id: string;
   config: ScheduleConfig;
   days: StudyDay[];
 }
