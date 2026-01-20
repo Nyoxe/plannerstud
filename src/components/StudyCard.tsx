@@ -4,23 +4,53 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { Clock, Calendar, FileText, ChevronDown, ChevronUp } from "lucide-react";
-import { StudyDay, Task } from "@/types/schedule";
+import { StudyDay, Task, EnrichedContent } from "@/types/schedule";
 import { calculateDayProgress } from "@/lib/schedule-generator";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { EnrichedContentSection } from "./EnrichedContentSection";
+import { supabase } from "@/integrations/supabase/client";
 
 interface StudyCardProps {
   day: StudyDay;
+  topic: string;
   onTaskToggle: (dayId: string, taskId: string) => void;
   onTimeChange: (dayId: string, time: string) => void;
   onNotesChange: (dayId: string, notes: string) => void;
+  onEnrichContent: (dayId: string, content: EnrichedContent) => void;
 }
 
-export function StudyCard({ day, onTaskToggle, onTimeChange, onNotesChange }: StudyCardProps) {
+export function StudyCard({ day, topic, onTaskToggle, onTimeChange, onNotesChange, onEnrichContent }: StudyCardProps) {
+  const [enrichLoading, setEnrichLoading] = useState(false);
   const [expanded, setExpanded] = useState(true);
   const { completed, total } = calculateDayProgress(day);
   const progressPercent = total > 0 ? (completed / total) * 100 : 0;
   const isComplete = completed === total;
+
+  const handleFetchEnrichedContent = async () => {
+    setEnrichLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("enrich-content", {
+        body: {
+          topic,
+          subtopic: day.title,
+          level: "intermediate",
+        },
+      });
+
+      if (error) {
+        onEnrichContent(day.id, { error: error.message });
+      } else {
+        onEnrichContent(day.id, data as EnrichedContent);
+      }
+    } catch (err) {
+      onEnrichContent(day.id, { 
+        error: err instanceof Error ? err.message : "Erro ao buscar conteúdo" 
+      });
+    } finally {
+      setEnrichLoading(false);
+    }
+  };
 
   return (
     <Card className={`study-card animate-slide-up transition-all ${isComplete ? "border-success/50 bg-success/5" : ""}`}>
@@ -102,6 +132,12 @@ export function StudyCard({ day, onTaskToggle, onTimeChange, onNotesChange }: St
               />
             </div>
           </div>
+
+          <EnrichedContentSection
+            content={day.enrichedContent}
+            onFetch={handleFetchEnrichedContent}
+            isLoading={enrichLoading}
+          />
         </CardContent>
       )}
     </Card>

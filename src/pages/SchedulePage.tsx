@@ -6,7 +6,7 @@ import { StudyCard } from "@/components/StudyCard";
 import { CalendarGrid } from "@/components/CalendarGrid";
 import { loadSchedule, saveSchedule, getThemePreference } from "@/lib/storage";
 import { calculateProgress } from "@/lib/schedule-generator";
-import { Schedule } from "@/types/schedule";
+import { Schedule, EnrichedContent } from "@/types/schedule";
 import { LayoutList, CalendarDays } from "lucide-react";
 
 export default function SchedulePage() {
@@ -65,6 +65,18 @@ export default function SchedulePage() {
 
     const updatedDays = schedule.days.map((day) =>
       day.id === dayId ? { ...day, notes } : day
+    );
+
+    const updatedSchedule = { ...schedule, days: updatedDays };
+    setSchedule(updatedSchedule);
+    saveSchedule(updatedSchedule);
+  };
+
+  const handleEnrichContent = (dayId: string, content: EnrichedContent) => {
+    if (!schedule) return;
+
+    const updatedDays = schedule.days.map((day) =>
+      day.id === dayId ? { ...day, enrichedContent: content } : day
     );
 
     const updatedSchedule = { ...schedule, days: updatedDays };
@@ -135,9 +147,11 @@ export default function SchedulePage() {
               <div key={day.id} id={`day-${day.id}`}>
                 <StudyCard
                   day={day}
+                  topic={schedule.config.topic}
                   onTaskToggle={handleTaskToggle}
                   onTimeChange={handleTimeChange}
                   onNotesChange={handleNotesChange}
+                  onEnrichContent={handleEnrichContent}
                 />
               </div>
             ))}
@@ -154,9 +168,11 @@ export default function SchedulePage() {
             <div key={day.id}>
               <StudyCard
                 day={day}
+                topic={schedule.config.topic}
                 onTaskToggle={handleTaskToggle}
                 onTimeChange={handleTimeChange}
                 onNotesChange={handleNotesChange}
+                onEnrichContent={handleEnrichContent}
               />
             </div>
           ))}
