@@ -12,10 +12,12 @@ import {
 } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Progress } from "@/components/ui/progress";
 import { BookOpen, Clock, Target, GraduationCap, Timer, Sparkles } from "lucide-react";
-import { ScheduleConfig, Level, Goal } from "@/types/schedule";
+import { ScheduleConfig, Level, Goal, Schedule, EnrichedContent } from "@/types/schedule";
 import { generateSchedule } from "@/lib/schedule-generator";
 import { saveSchedule } from "@/lib/storage";
+import { supabase } from "@/integrations/supabase/client";
 
 interface ScheduleFormProps {
   onSuccess?: () => void;
@@ -24,6 +26,8 @@ interface ScheduleFormProps {
 export function ScheduleForm({ onSuccess }: ScheduleFormProps) {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
+  const [loadingProgress, setLoadingProgress] = useState(0);
+  const [loadingMessage, setLoadingMessage] = useState("");
   
   const [formData, setFormData] = useState({
     topic: "",
@@ -35,6 +39,44 @@ export function ScheduleForm({ onSuccess }: ScheduleFormProps) {
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const enrichAllDays = async (schedule: Schedule): Promise<Schedule> => {
+    const enrichedDays = [...schedule.days];
+    const totalDays = enrichedDays.length;
+    
+    for (let i = 0; i < totalDays; i++) {
+      const day = enrichedDays[i];
+      setLoadingMessage(`Gerando conteúdo para "${day.title}"...`);
+      setLoadingProgress(((i + 1) / totalDays) * 100);
+      
+      try {
+        const { data, error } = await supabase.functions.invoke("enrich-content", {
+          body: {
+            topic: schedule.config.topic,
+            subtopic: day.title,
+            level: schedule.config.level,
+          },
+        });
+
+        if (!error && data) {
+          enrichedDays[i] = {
+            ...day,
+            enrichedContent: data as EnrichedContent,
+          };
+        }
+      } catch (err) {
+        console.error(`Failed to enrich day ${i + 1}:`, err);
+        // Continue with other days even if one fails
+      }
+      
+      // Small delay between requests to avoid rate limiting
+      if (i < totalDays - 1) {
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+    }
+    
+    return { ...schedule, days: enrichedDays };
+  };
 
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
@@ -59,9 +101,8 @@ export function ScheduleForm({ onSuccess }: ScheduleFormProps) {
     if (!validateForm()) return;
     
     setIsLoading(true);
-    
-    // Simulate loading for better UX
-    await new Promise(resolve => setTimeout(resolve, 1200));
+    setLoadingProgress(0);
+    setLoadingMessage("Criando estrutura do cronograma...");
     
     const config: ScheduleConfig = {
       topic: formData.topic.trim(),
@@ -73,7 +114,12 @@ export function ScheduleForm({ onSuccess }: ScheduleFormProps) {
       createdAt: new Date(),
     };
     
-    const schedule = generateSchedule(config);
+    let schedule = generateSchedule(config);
+    
+    // Enrich all days with AI content
+    setLoadingMessage("Gerando conteúdo com IA...");
+    schedule = await enrichAllDays(schedule);
+    
     saveSchedule(schedule);
     
     if (onSuccess) {
@@ -83,7 +129,7 @@ export function ScheduleForm({ onSuccess }: ScheduleFormProps) {
   };
 
   if (isLoading) {
-    return <LoadingState />;
+    return <LoadingState progress={loadingProgress} message={loadingMessage} />;
   }
 
   return (
@@ -217,28 +263,43 @@ export function ScheduleForm({ onSuccess }: ScheduleFormProps) {
   );
 }
 
-function LoadingState() {
+interface LoadingStateProps {
+  progress: number;
+  message: string;
+}
+
+function LoadingState({ progress, message }: LoadingStateProps) {
   return (
     <Card className="w-full max-w-lg animate-fade-in">
       <CardContent className="pt-6 space-y-4">
-        <div className="text-center space-y-2 py-4">
+        <div className="text-center space-y-3 py-4">
           <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-primary/10 animate-pulse-soft">
             <Sparkles className="h-6 w-6 text-primary" />
           </div>
-          <p className="text-sm font-medium text-muted-foreground">
-            Gerando cronograma personalizado...
+          <div className="space-y-1">
+            <p className="text-sm font-medium text-foreground">
+              Gerando cronograma com IA
+            </p>
+            <p className="text-xs text-muted-foreground line-clamp-1 max-w-xs mx-auto">
+              {message || "Preparando..."}
+            </p>
+          </div>
+        </div>
+        
+        <div className="space-y-2">
+          <Progress value={progress} className="h-2" />
+          <p className="text-xs text-center text-muted-foreground">
+            {Math.round(progress)}% concluído
           </p>
         </div>
         
-        <div className="space-y-3">
+        <div className="space-y-3 opacity-50">
           <Skeleton className="h-12 w-full" />
           <div className="grid grid-cols-2 gap-4">
             <Skeleton className="h-12" />
             <Skeleton className="h-12" />
           </div>
           <Skeleton className="h-12 w-full" />
-          <Skeleton className="h-12 w-full" />
-          <Skeleton className="h-10 w-full" />
         </div>
       </CardContent>
     </Card>
