@@ -35,14 +35,14 @@ Responda APENAS em formato JSON válido:
   ]
 }`;
 
-    const response = await fetch("https://api.lovable.dev/v1/chat/completions", {
+    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "Authorization": `Bearer ${Deno.env.get("LOVABLE_API_KEY")}`,
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model: "google/gemini-3-flash-preview",
         messages: [
           { role: "system", content: "Você é um assistente educacional especializado em criar conteúdo de estudo. Sempre responda em JSON válido." },
           { role: "user", content: prompt }
