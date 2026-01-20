@@ -1,6 +1,19 @@
 export type Level = "beginner" | "intermediate" | "advanced";
 export type Goal = "exam" | "skill" | "review";
 
+export interface Resource {
+  title: string;
+  url: string;
+  type: "article" | "video" | "course" | "documentation";
+}
+
+export interface EnrichedContent {
+  summary?: string;
+  resources?: Resource[];
+  isLoading?: boolean;
+  error?: string;
+}
+
 export interface Task {
   id: string;
   title: string;
@@ -16,6 +29,7 @@ export interface StudyDay {
   tasks: Task[];
   scheduledTime?: string; // HH:MM format
   notes?: string;
+  enrichedContent?: EnrichedContent;
 }
 
 export interface ScheduleConfig {
