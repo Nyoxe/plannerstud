@@ -147,7 +147,7 @@ export function StudyCard({ day, topic, onTaskToggle, onTimeChange, onNotesChang
 function TaskItem({ task, onToggle }: { task: Task; onToggle: () => void }) {
   return (
     <div 
-      className={`flex items-center gap-3 p-2 rounded-md transition-colors hover:bg-muted/50 ${
+      className={`flex items-start gap-3 p-2 rounded-md transition-colors hover:bg-muted/50 ${
         task.completed ? "opacity-60" : ""
       }`}
     >
@@ -155,16 +155,32 @@ function TaskItem({ task, onToggle }: { task: Task; onToggle: () => void }) {
         id={task.id}
         checked={task.completed}
         onCheckedChange={onToggle}
-        className="data-[state=checked]:bg-success data-[state=checked]:border-success"
+        className="mt-0.5 data-[state=checked]:bg-success data-[state=checked]:border-success"
       />
-      <label
-        htmlFor={task.id}
-        className={`text-sm flex-1 cursor-pointer ${
-          task.completed ? "line-through text-muted-foreground" : ""
-        }`}
-      >
-        {task.title}
-      </label>
+      <div className="flex-1 space-y-1">
+        <div className="flex items-center gap-2">
+          <label
+            htmlFor={task.id}
+            className={`text-sm cursor-pointer ${
+              task.completed ? "line-through text-muted-foreground" : ""
+            }`}
+          >
+            {task.title}
+          </label>
+          {task.durationMin && (
+            <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+              {task.durationMin}min
+            </span>
+          )}
+        </div>
+        {task.acceptanceCriteria && task.acceptanceCriteria.length > 0 && (
+          <div className="text-xs text-muted-foreground pl-0.5">
+            {task.acceptanceCriteria.map((c, i) => (
+              <span key={i} className="block">• {c}</span>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

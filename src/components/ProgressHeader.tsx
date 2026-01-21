@@ -2,7 +2,7 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { ArrowLeft, Download, Printer, Trophy } from "lucide-react";
+import { ArrowLeft, Download, Printer, Trophy, CalendarCheck } from "lucide-react";
 import {
   Tooltip,
   TooltipContent,
@@ -60,6 +60,21 @@ export function ProgressHeader({
 
           {/* Right section */}
           <div className="flex items-center gap-1">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => navigate("/today")}
+                  className="h-8 w-8"
+                  aria-label="Foco do dia"
+                >
+                  <CalendarCheck className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Foco do dia</TooltipContent>
+            </Tooltip>
+
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
