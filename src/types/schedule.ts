@@ -18,6 +18,10 @@ export interface Task {
   id: string;
   title: string;
   completed: boolean;
+  durationMin?: number; // 5-180
+  acceptanceCriteria?: string[]; // 1-3 items
+  resources?: string[];
+  timeSpentMin?: number; // tempo real gasto
 }
 
 export interface StudyDay {
