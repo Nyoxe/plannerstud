@@ -17,7 +17,8 @@ import {
   Scissors,
   Flame,
   Target,
-  CheckCircle2
+  CheckCircle2,
+  LogOut
 } from "lucide-react";
 import { loadSchedule, saveSchedule, getThemePreference } from "@/lib/storage";
 import { Schedule, Task } from "@/types/schedule";
@@ -41,6 +42,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { supabase } from "@/integrations/supabase/client";
 
 export default function TodayPage() {
   const navigate = useNavigate();
@@ -171,6 +173,11 @@ export default function TodayPage() {
     toast({ title: "Cronograma replanejado", description: "Tarefas atrasadas foram movidas para hoje." });
   };
 
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    navigate("/login");
+  };
+
   // Verificar se há tarefas atrasadas
   const hasBacklog = schedule.days.slice(0, todayIndex).some(day =>
     day.tasks.some(t => !t.completed)
@@ -201,6 +208,10 @@ export default function TodayPage() {
                   Replanejar
                 </Button>
               )}
+
+              <Button variant="ghost" size="sm" onClick={handleLogout}>
+                <LogOut className="h-4 w-4" />
+              </Button>
             </div>
           </div>
         </div>
