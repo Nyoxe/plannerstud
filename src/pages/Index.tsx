@@ -28,6 +28,12 @@ const Index = () => {
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!loading && !session) {
+      navigate("/login", { replace: true });
+    }
+  }, [session, loading, navigate]);
+
+  useEffect(() => {
     const theme = getThemePreference();
     document.documentElement.classList.toggle("dark", theme === "dark");
     loadSchedules();
