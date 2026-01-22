@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { ScheduleForm } from "@/components/ScheduleForm";
 import { ScheduleCard } from "@/components/ScheduleCard";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { getAllSchedules, deleteSchedule, setActiveScheduleId, getThemePreference } from "@/lib/storage";
 import { Schedule } from "@/types/schedule";
-import { CalendarCheck, Sparkles, Plus } from "lucide-react";
+import { CalendarCheck, Sparkles, Plus, LogIn, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   AlertDialog,
@@ -17,9 +17,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { useSession } from "@/lib/useSession";
+import { supabase } from "@/integrations/supabase/client";
 
 const Index = () => {
   const navigate = useNavigate();
+  const { session, loading } = useSession();
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -50,6 +53,10 @@ const Index = () => {
     setShowForm(false);
   };
 
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+  };
+
   const hasSchedules = schedules.length > 0;
 
   return (
@@ -77,6 +84,21 @@ const Index = () => {
               </Button>
             )}
             <ThemeToggle />
+            
+            {!loading && (
+              session ? (
+                <Button variant="ghost" size="sm" onClick={handleLogout}>
+                  <LogOut className="h-4 w-4" />
+                </Button>
+              ) : (
+                <Link to="/login">
+                  <Button variant="outline" size="sm" className="gap-1.5">
+                    <LogIn className="h-3.5 w-3.5" />
+                    Entrar
+                  </Button>
+                </Link>
+              )
+            )}
           </div>
         </div>
       </header>
