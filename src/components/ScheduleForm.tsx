@@ -120,7 +120,7 @@ export function ScheduleForm({ onSuccess }: ScheduleFormProps) {
     setLoadingMessage("Gerando conteúdo com IA...");
     schedule = await enrichAllDays(schedule);
     
-    saveSchedule(schedule);
+    await saveSchedule(schedule);
     
     if (onSuccess) {
       onSuccess();
