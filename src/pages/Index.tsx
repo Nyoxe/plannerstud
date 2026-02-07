@@ -3,9 +3,9 @@ import { useNavigate, Link } from "react-router-dom";
 import { ScheduleForm } from "@/components/ScheduleForm";
 import { ScheduleCard } from "@/components/ScheduleCard";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { getAllSchedules, deleteSchedule, setActiveScheduleId, getThemePreference } from "@/lib/storage";
+import { getAllSchedules, deleteSchedule, setActiveScheduleId, getThemePreference, migrateLocalToSupabase } from "@/lib/storage";
 import { Schedule } from "@/types/schedule";
-import { CalendarCheck, Sparkles, Plus, LogIn, LogOut } from "lucide-react";
+import { CalendarCheck, Sparkles, Plus, LogIn, LogOut, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   AlertDialog,
@@ -19,28 +19,50 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useSession } from "@/lib/useSession";
 import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 const Index = () => {
   const navigate = useNavigate();
-  const { session, loading } = useSession();
+  const { session, loading: sessionLoading } = useSession();
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [loadingSchedules, setLoadingSchedules] = useState(true);
 
   useEffect(() => {
-    if (!loading && !session) {
+    if (!sessionLoading && !session) {
       navigate("/login", { replace: true });
     }
-  }, [session, loading, navigate]);
+  }, [session, sessionLoading, navigate]);
 
   useEffect(() => {
     const theme = getThemePreference();
     document.documentElement.classList.toggle("dark", theme === "dark");
-    loadSchedules();
   }, []);
 
-  const loadSchedules = () => {
-    setSchedules(getAllSchedules());
+  useEffect(() => {
+    if (session) {
+      loadSchedulesFromDB();
+    }
+  }, [session]);
+
+  const loadSchedulesFromDB = async () => {
+    setLoadingSchedules(true);
+    try {
+      // First, try to migrate local data
+      const migrated = await migrateLocalToSupabase();
+      if (migrated) {
+        toast.success("Seus cronogramas locais foram sincronizados!");
+      }
+
+      const data = await getAllSchedules();
+      setSchedules(data);
+    } catch (error) {
+      console.error("Failed to load schedules:", error);
+      toast.error("Erro ao carregar cronogramas");
+    } finally {
+      setLoadingSchedules(false);
+    }
   };
 
   const handleSelectSchedule = (id: string) => {
@@ -48,14 +70,15 @@ const Index = () => {
     navigate("/schedule");
   };
 
-  const handleDeleteSchedule = (id: string) => {
-    deleteSchedule(id);
-    loadSchedules();
+  const handleDeleteSchedule = async (id: string) => {
+    await deleteSchedule(id);
+    await loadSchedulesFromDB();
     setDeleteId(null);
+    toast.success("Cronograma excluído");
   };
 
   const handleFormSuccess = () => {
-    loadSchedules();
+    loadSchedulesFromDB();
     setShowForm(false);
   };
 
@@ -64,6 +87,14 @@ const Index = () => {
   };
 
   const hasSchedules = schedules.length > 0;
+
+  if (sessionLoading || (session && loadingSchedules)) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -91,7 +122,7 @@ const Index = () => {
             )}
             <ThemeToggle />
             
-            {!loading && (
+            {!sessionLoading && (
               session ? (
                 <Button variant="ghost" size="sm" onClick={handleLogout}>
                   <LogOut className="h-4 w-4" />
@@ -142,8 +173,8 @@ const Index = () => {
             {/* Footer note */}
             {!hasSchedules && (
               <p className="text-xs text-muted-foreground text-center max-w-sm">
-                Seus cronogramas são salvos localmente no navegador. 
-                Você pode retomar de onde parou a qualquer momento.
+                Seus cronogramas são salvos automaticamente na nuvem. 
+                Você pode acessá-los de qualquer dispositivo.
               </p>
             )}
           </div>

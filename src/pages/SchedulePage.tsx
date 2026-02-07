@@ -7,11 +7,12 @@ import { CalendarGrid } from "@/components/CalendarGrid";
 import { loadSchedule, saveSchedule, getThemePreference } from "@/lib/storage";
 import { calculateProgress } from "@/lib/schedule-generator";
 import { Schedule, EnrichedContent } from "@/types/schedule";
-import { LayoutList, CalendarDays } from "lucide-react";
+import { LayoutList, CalendarDays, Loader2 } from "lucide-react";
 
 export default function SchedulePage() {
   const navigate = useNavigate();
   const [schedule, setSchedule] = useState<Schedule | null>(null);
+  const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("timeline");
   const contentRef = useRef<HTMLDivElement>(null);
 
@@ -21,15 +22,21 @@ export default function SchedulePage() {
     document.documentElement.classList.toggle("dark", theme === "dark");
 
     // Load schedule
-    const saved = loadSchedule();
-    if (!saved) {
-      navigate("/");
-      return;
-    }
-    setSchedule(saved);
+    const loadData = async () => {
+      setLoading(true);
+      const saved = await loadSchedule();
+      if (!saved) {
+        navigate("/");
+        return;
+      }
+      setSchedule(saved);
+      setLoading(false);
+    };
+
+    loadData();
   }, [navigate]);
 
-  const handleTaskToggle = (dayId: string, taskId: string) => {
+  const handleTaskToggle = async (dayId: string, taskId: string) => {
     if (!schedule) return;
 
     const updatedDays = schedule.days.map((day) => {
@@ -45,10 +52,10 @@ export default function SchedulePage() {
 
     const updatedSchedule = { ...schedule, days: updatedDays };
     setSchedule(updatedSchedule);
-    saveSchedule(updatedSchedule);
+    await saveSchedule(updatedSchedule);
   };
 
-  const handleTimeChange = (dayId: string, time: string) => {
+  const handleTimeChange = async (dayId: string, time: string) => {
     if (!schedule) return;
 
     const updatedDays = schedule.days.map((day) =>
@@ -57,10 +64,10 @@ export default function SchedulePage() {
 
     const updatedSchedule = { ...schedule, days: updatedDays };
     setSchedule(updatedSchedule);
-    saveSchedule(updatedSchedule);
+    await saveSchedule(updatedSchedule);
   };
 
-  const handleNotesChange = (dayId: string, notes: string) => {
+  const handleNotesChange = async (dayId: string, notes: string) => {
     if (!schedule) return;
 
     const updatedDays = schedule.days.map((day) =>
@@ -69,10 +76,10 @@ export default function SchedulePage() {
 
     const updatedSchedule = { ...schedule, days: updatedDays };
     setSchedule(updatedSchedule);
-    saveSchedule(updatedSchedule);
+    await saveSchedule(updatedSchedule);
   };
 
-  const handleEnrichContent = (dayId: string, content: EnrichedContent) => {
+  const handleEnrichContent = async (dayId: string, content: EnrichedContent) => {
     if (!schedule) return;
 
     const updatedDays = schedule.days.map((day) =>
@@ -81,7 +88,7 @@ export default function SchedulePage() {
 
     const updatedSchedule = { ...schedule, days: updatedDays };
     setSchedule(updatedSchedule);
-    saveSchedule(updatedSchedule);
+    await saveSchedule(updatedSchedule);
   };
 
   const handleDayClick = (dayId: string) => {
@@ -104,6 +111,14 @@ export default function SchedulePage() {
     // Placeholder for future implementation
     console.log("PNG export - coming soon");
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   if (!schedule) {
     return null;
@@ -178,21 +193,6 @@ export default function SchedulePage() {
           ))}
         </div>
       </main>
-
-      {/* 
-        EXTENSÃO FUTURA - Supabase Integration:
-        
-        Para habilitar login e persistência na nuvem:
-        1. Adicionar variáveis VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY
-        2. Criar tabela 'schedules' com RLS
-        3. Implementar auth via Supabase Auth
-        4. Substituir localStorage por queries Supabase
-        
-        Verificar se vars existem:
-        const supabaseEnabled = import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY;
-        
-        Se não existirem, continuar usando localStorage (comportamento atual).
-      */}
     </div>
   );
 }

@@ -48,6 +48,7 @@ export default function TodayPage() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [schedule, setSchedule] = useState<Schedule | null>(null);
+  const [loading, setLoading] = useState(true);
   const [streak, setStreak] = useState(0);
   const [splitDialogOpen, setSplitDialogOpen] = useState(false);
   const [splitTaskData, setSplitTaskData] = useState<{ dayId: string; taskId: string; duration: number } | null>(null);
@@ -57,20 +58,26 @@ export default function TodayPage() {
     const theme = getThemePreference();
     document.documentElement.classList.toggle("dark", theme === "dark");
 
-    const saved = loadSchedule();
-    if (!saved) {
-      navigate("/");
-      return;
-    }
-    // Migrar dados antigos
-    const migrated = migrateSchedule(saved);
-    setSchedule(migrated);
+    const loadData = async () => {
+      setLoading(true);
+      const saved = await loadSchedule();
+      if (!saved) {
+        navigate("/");
+        return;
+      }
+      // Migrar dados antigos
+      const migrated = migrateSchedule(saved);
+      setSchedule(migrated);
+      setLoading(false);
+    };
+
+    loadData();
     
     const { streak: currentStreak } = getStreakData();
     setStreak(currentStreak);
   }, [navigate]);
 
-  if (!schedule) return null;
+  if (loading || !schedule) return null;
 
   const todayIndex = getTodayIndex(schedule);
   const todayDay = getTodayDay(schedule);
@@ -95,7 +102,7 @@ export default function TodayPage() {
   const totalCount = todayDay.tasks.length;
   const progressPercent = totalCount > 0 ? (completedCount / totalCount) * 100 : 0;
 
-  const handleTaskToggle = (taskId: string) => {
+  const handleTaskToggle = async (taskId: string) => {
     const updatedDays = schedule.days.map(day => {
       if (day.id !== todayDay.id) return day;
       return {
@@ -108,7 +115,7 @@ export default function TodayPage() {
 
     const updatedSchedule = { ...schedule, days: updatedDays };
     setSchedule(updatedSchedule);
-    saveSchedule(updatedSchedule);
+    await saveSchedule(updatedSchedule);
 
     // Atualizar streak se completou pelo menos uma tarefa
     const hasCompleted = updatedDays.find(d => d.id === todayDay.id)?.tasks.some(t => t.completed);
@@ -118,7 +125,7 @@ export default function TodayPage() {
     }
   };
 
-  const handlePostpone = (taskId: string) => {
+  const handlePostpone = async (taskId: string) => {
     if (todayIndex >= schedule.days.length - 1) {
       toast({
         title: "Não é possível adiar",
@@ -130,7 +137,7 @@ export default function TodayPage() {
     
     const updated = postponeTask(schedule, todayDay.id, taskId);
     setSchedule(updated);
-    saveSchedule(updated);
+    await saveSchedule(updated);
     toast({ title: "Tarefa adiada para amanhã" });
   };
 
@@ -140,7 +147,7 @@ export default function TodayPage() {
     setSplitDialogOpen(true);
   };
 
-  const handleSplitConfirm = () => {
+  const handleSplitConfirm = async () => {
     if (!splitTaskData) return;
     
     if (splitDuration < 5 || splitDuration >= splitTaskData.duration) {
@@ -154,22 +161,22 @@ export default function TodayPage() {
 
     const updated = splitTask(schedule, splitTaskData.dayId, splitTaskData.taskId, splitDuration);
     setSchedule(updated);
-    saveSchedule(updated);
+    await saveSchedule(updated);
     setSplitDialogOpen(false);
     toast({ title: "Tarefa dividida em 2 partes" });
   };
 
-  const handleTimeSpentChange = (taskId: string, value: string) => {
+  const handleTimeSpentChange = async (taskId: string, value: string) => {
     const timeSpent = parseInt(value, 10) || 0;
     const updated = updateTaskTimeSpent(schedule, todayDay.id, taskId, timeSpent);
     setSchedule(updated);
-    saveSchedule(updated);
+    await saveSchedule(updated);
   };
 
-  const handleReplan = () => {
+  const handleReplan = async () => {
     const updated = replanFromToday(schedule);
     setSchedule(updated);
-    saveSchedule(updated);
+    await saveSchedule(updated);
     toast({ title: "Cronograma replanejado", description: "Tarefas atrasadas foram movidas para hoje." });
   };
 
