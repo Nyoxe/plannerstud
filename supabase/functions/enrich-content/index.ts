@@ -3,7 +3,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
 // Função para extrair JSON de resposta com markdown
@@ -23,17 +23,20 @@ function extractJsonFromResponse(content: string): string {
 // Valida e normaliza a resposta da IA
 function validateAndNormalizeResponse(data: unknown): {
   summary: string;
-  resources: Array<{ title: string; url: string; type: string }>;
-  tasks?: Array<{
+  keyTopics: string[];
+  tasks: Array<{
     title: string;
+    description: string;
     durationMin: number;
     acceptanceCriteria: string[];
-    resources?: string[];
   }>;
+  studyTips: string[];
 } {
   const result: ReturnType<typeof validateAndNormalizeResponse> = {
     summary: "",
-    resources: [],
+    keyTopics: [],
+    tasks: [],
+    studyTips: [],
   };
   
   if (typeof data !== 'object' || data === null) {
@@ -47,19 +50,21 @@ function validateAndNormalizeResponse(data: unknown): {
     result.summary = obj.summary;
   }
   
-  // Resources (formato legado)
-  if (Array.isArray(obj.resources)) {
-    result.resources = obj.resources
-      .filter((r): r is Record<string, unknown> => typeof r === 'object' && r !== null)
-      .map(r => ({
-        title: typeof r.title === 'string' ? r.title : "Recurso",
-        url: typeof r.url === 'string' ? r.url : "#",
-        type: typeof r.type === 'string' ? r.type : "article"
-      }))
+  // Key Topics
+  if (Array.isArray(obj.keyTopics)) {
+    result.keyTopics = obj.keyTopics
+      .filter((t): t is string => typeof t === 'string')
       .slice(0, 5);
   }
   
-  // Tasks (novo formato com durationMin e acceptanceCriteria)
+  // Study Tips
+  if (Array.isArray(obj.studyTips)) {
+    result.studyTips = obj.studyTips
+      .filter((t): t is string => typeof t === 'string')
+      .slice(0, 3);
+  }
+  
+  // Tasks (com durationMin, description e acceptanceCriteria)
   if (Array.isArray(obj.tasks)) {
     result.tasks = obj.tasks
       .filter((t): t is Record<string, unknown> => typeof t === 'object' && t !== null)
@@ -76,21 +81,14 @@ function validateAndNormalizeResponse(data: unknown): {
             .slice(0, 3);
         }
         
-        let resources: string[] | undefined;
-        if (Array.isArray(t.resources)) {
-          resources = t.resources
-            .filter((r): r is string => typeof r === 'string')
-            .slice(0, 3);
-        }
-        
         return {
           title: typeof t.title === 'string' ? t.title : "Tarefa",
+          description: typeof t.description === 'string' ? t.description : "",
           durationMin,
           acceptanceCriteria,
-          resources
         };
       })
-      .slice(0, 10);
+      .slice(0, 6);
   }
   
   return result;
@@ -105,7 +103,7 @@ serve(async (req) => {
     console.log("Processing enrich-content request");
 
     const body = await req.json();
-    const { topic, subtopic, level, mode } = body;
+    const { topic, subtopic, level } = body;
 
     if (!topic || !subtopic) {
       return new Response(
@@ -114,31 +112,44 @@ serve(async (req) => {
       );
     }
 
-    // Novo prompt para JSON estrito com tasks, durationMin e acceptanceCriteria
+    // Prompt focado em conteúdo educativo SEM links externos (que seriam alucinações)
     const prompt = `Você é um assistente educacional especializado. Para o tema "${topic}" e subtópico "${subtopic}" (nível: ${level || 'intermediário'}):
 
-Gere um JSON VÁLIDO com a seguinte estrutura EXATA (sem markdown, sem texto adicional):
+Gere um JSON VÁLIDO com a seguinte estrutura EXATA:
 
 {
-  "summary": "Resumo conciso de 2-3 parágrafos sobre o subtópico",
-  "resources": [
-    {"title": "Nome", "url": "https://...", "type": "article|video|course|documentation"}
+  "summary": "Resumo educativo de 2-3 parágrafos explicando o subtópico de forma clara e didática. Inclua conceitos-chave, importância e aplicações práticas.",
+  "keyTopics": [
+    "Conceito ou tópico importante 1",
+    "Conceito ou tópico importante 2",
+    "Conceito ou tópico importante 3"
   ],
   "tasks": [
     {
-      "title": "Nome da tarefa",
+      "title": "Nome da atividade de estudo",
+      "description": "Descrição detalhada do que fazer, como fazer e o que aprender",
       "durationMin": 25,
-      "acceptanceCriteria": ["Critério verificável 1", "Critério verificável 2"],
-      "resources": ["URL ou nome de recurso"]
+      "acceptanceCriteria": [
+        "Critério verificável para saber se completou",
+        "Outro critério mensurável"
+      ]
     }
+  ],
+  "studyTips": [
+    "Dica prática de estudo 1",
+    "Dica prática de estudo 2"
   ]
 }
 
 REGRAS OBRIGATÓRIAS:
-- durationMin: inteiro entre 5 e 180
-- acceptanceCriteria: 1 a 3 itens curtos e verificáveis (ex: "Consegue explicar X", "Resolve exercício Y")
-- Gere 3-5 tasks relevantes para o subtópico
-- Retorne APENAS o JSON, sem markdown ou texto extra`;
+- NÃO inclua URLs ou links (eles não serão válidos)
+- summary: texto rico e educativo de 2-3 parágrafos
+- keyTopics: 3-5 conceitos importantes para dominar
+- tasks: 3-5 atividades práticas com descrições detalhadas
+- durationMin: inteiro entre 5 e 180 minutos
+- acceptanceCriteria: 2-3 itens verificáveis (ex: "Consegue explicar X sem consulta")
+- studyTips: 2-3 dicas práticas de como estudar melhor o tema
+- Retorne APENAS o JSON válido, sem markdown`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -151,12 +162,12 @@ REGRAS OBRIGATÓRIAS:
         messages: [
           { 
             role: "system", 
-            content: "Você retorna APENAS JSON válido, sem markdown, sem explicações. Siga exatamente o schema pedido." 
+            content: "Você é um educador especializado que cria conteúdo didático de alta qualidade. Retorne APENAS JSON válido, sem markdown. NUNCA inclua URLs ou links externos - foque apenas em conteúdo educativo textual." 
           },
           { role: "user", content: prompt }
         ],
-        temperature: 0.5,
-        max_tokens: 2000,
+        temperature: 0.6,
+        max_tokens: 2500,
       }),
     });
 
@@ -186,16 +197,17 @@ REGRAS OBRIGATÓRIAS:
       console.error("Failed to parse AI response:", parseError, "\nContent:", content);
       // Fallback seguro
       enrichedContent = {
-        summary: `Estudo sobre ${subtopic} no contexto de ${topic}.`,
-        resources: [],
+        summary: `Este módulo aborda "${subtopic}" no contexto de ${topic}. Estude os conceitos fundamentais e pratique com exercícios para consolidar o aprendizado.`,
+        keyTopics: [subtopic],
         tasks: [
           {
             title: `Estudar ${subtopic}`,
+            description: `Dedique tempo para compreender os conceitos básicos de ${subtopic}. Faça anotações e revise o material.`,
             durationMin: 30,
-            acceptanceCriteria: ["Compreender os conceitos básicos"],
-            resources: []
+            acceptanceCriteria: ["Compreender os conceitos básicos", "Conseguir explicar com suas palavras"],
           }
         ],
+        studyTips: ["Faça pausas regulares", "Pratique ativamente"],
         _fallback: true
       };
     }
