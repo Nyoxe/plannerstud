@@ -11,18 +11,83 @@ import {
   CheckCircle2,
   RefreshCw,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  X,
+  Loader2
 } from "lucide-react";
 import type { EnrichedContent } from "@/types/schedule";
+import { supabase } from "@/integrations/supabase/client";
 
 interface EnrichedContentSectionProps {
   content?: EnrichedContent;
   onFetch: () => void;
   isLoading: boolean;
+  mainTopic?: string;
 }
 
-export function EnrichedContentSection({ content, onFetch, isLoading }: EnrichedContentSectionProps) {
+interface TopicExplanation {
+  topic: string;
+  explanation: string;
+  isLoading: boolean;
+  error?: string;
+}
+
+export function EnrichedContentSection({ content, onFetch, isLoading, mainTopic }: EnrichedContentSectionProps) {
   const [expanded, setExpanded] = useState(false);
+  const [topicExplanations, setTopicExplanations] = useState<Record<string, TopicExplanation>>({});
+  const [selectedTopic, setSelectedTopic] = useState<string | null>(null);
+
+  const handleTopicClick = async (topic: string) => {
+    // If already selected, close it
+    if (selectedTopic === topic) {
+      setSelectedTopic(null);
+      return;
+    }
+
+    setSelectedTopic(topic);
+
+    // If we already have the explanation, just show it
+    if (topicExplanations[topic]?.explanation) {
+      return;
+    }
+
+    // Generate explanation for this topic
+    setTopicExplanations(prev => ({
+      ...prev,
+      [topic]: { topic, explanation: "", isLoading: true }
+    }));
+
+    try {
+      const { data, error } = await supabase.functions.invoke('explain-topic', {
+        body: { 
+          topic: topic,
+          context: mainTopic || "estudo geral"
+        }
+      });
+
+      if (error) throw error;
+
+      setTopicExplanations(prev => ({
+        ...prev,
+        [topic]: { 
+          topic, 
+          explanation: data.explanation || "Não foi possível gerar a explicação.", 
+          isLoading: false 
+        }
+      }));
+    } catch (err) {
+      console.error("Error generating topic explanation:", err);
+      setTopicExplanations(prev => ({
+        ...prev,
+        [topic]: { 
+          topic, 
+          explanation: "", 
+          isLoading: false, 
+          error: "Erro ao gerar explicação. Tente novamente." 
+        }
+      }));
+    }
+  };
 
   // If no content yet, show the fetch button
   if (!content && !isLoading) {
@@ -112,19 +177,77 @@ export function EnrichedContentSection({ content, onFetch, isLoading }: Enriched
         </div>
       )}
 
-      {/* Key Topics */}
+      {/* Key Topics - Now Clickable */}
       {content?.keyTopics && content.keyTopics.length > 0 && (
-        <div className="flex flex-wrap gap-1.5">
-          {content.keyTopics.slice(0, expanded ? undefined : 3).map((topic, index) => (
-            <Badge key={index} variant="secondary" className="text-xs font-normal">
-              <BookOpen className="h-3 w-3 mr-1" />
-              {topic}
-            </Badge>
-          ))}
-          {!expanded && content.keyTopics.length > 3 && (
-            <Badge variant="outline" className="text-xs font-normal">
-              +{content.keyTopics.length - 3}
-            </Badge>
+        <div className="space-y-2">
+          <div className="text-xs text-muted-foreground">
+            Clique em um tópico para ver a explicação:
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {content.keyTopics.slice(0, expanded ? undefined : 5).map((topic, index) => (
+              <Badge 
+                key={index} 
+                variant={selectedTopic === topic ? "default" : "secondary"}
+                className="text-xs font-normal cursor-pointer hover:bg-primary hover:text-primary-foreground transition-colors"
+                onClick={() => handleTopicClick(topic)}
+              >
+                <BookOpen className="h-3 w-3 mr-1" />
+                {topic}
+              </Badge>
+            ))}
+            {!expanded && content.keyTopics.length > 5 && (
+              <Badge variant="outline" className="text-xs font-normal">
+                +{content.keyTopics.length - 5}
+              </Badge>
+            )}
+          </div>
+
+          {/* Topic Explanation Panel */}
+          {selectedTopic && (
+            <div className="bg-primary/5 border border-primary/20 rounded-lg p-3 space-y-2 animate-in fade-in slide-in-from-top-2 duration-200">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-sm font-medium text-primary">
+                  <BookOpen className="h-4 w-4" />
+                  {selectedTopic}
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setSelectedTopic(null)}
+                  className="h-6 w-6 p-0"
+                >
+                  <X className="h-3 w-3" />
+                </Button>
+              </div>
+              
+              {topicExplanations[selectedTopic]?.isLoading ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground py-2">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span>Gerando explicação...</span>
+                </div>
+              ) : topicExplanations[selectedTopic]?.error ? (
+                <div className="text-sm text-destructive">
+                  {topicExplanations[selectedTopic].error}
+                  <Button
+                    variant="link"
+                    size="sm"
+                    onClick={() => handleTopicClick(selectedTopic)}
+                    className="text-xs ml-2"
+                  >
+                    Tentar novamente
+                  </Button>
+                </div>
+              ) : topicExplanations[selectedTopic]?.explanation ? (
+                <div className="text-sm text-muted-foreground leading-relaxed whitespace-pre-line">
+                  {topicExplanations[selectedTopic].explanation}
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground py-2">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span>Carregando...</span>
+                </div>
+              )}
+            </div>
           )}
         </div>
       )}
