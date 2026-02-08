@@ -137,6 +137,7 @@ export function StudyCard({ day, topic, onTaskToggle, onTimeChange, onNotesChang
             content={day.enrichedContent}
             onFetch={handleFetchEnrichedContent}
             isLoading={enrichLoading}
+            mainTopic={topic}
           />
         </CardContent>
       )}
