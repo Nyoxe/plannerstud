@@ -1,15 +1,16 @@
 export type Level = "beginner" | "intermediate" | "advanced";
 export type Goal = "exam" | "skill" | "review";
 
-export interface Resource {
-  title: string;
-  url: string;
-  type: "article" | "video" | "course" | "documentation";
-}
-
 export interface EnrichedContent {
   summary?: string;
-  resources?: Resource[];
+  keyTopics?: string[];
+  studyTips?: string[];
+  tasks?: Array<{
+    title: string;
+    description: string;
+    durationMin: number;
+    acceptanceCriteria: string[];
+  }>;
   isLoading?: boolean;
   error?: string;
 }
@@ -20,7 +21,6 @@ export interface Task {
   completed: boolean;
   durationMin?: number; // 5-180
   acceptanceCriteria?: string[]; // 1-3 items
-  resources?: string[];
   timeSpentMin?: number; // tempo real gasto
 }
 
